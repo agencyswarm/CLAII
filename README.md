@@ -94,7 +94,6 @@ calculator/
     calculator.py
     render.py
 
-main.py           # Thin wrapper that calls claii.cli:main (for now)
 pyproject.toml
 README.md
 .env.example      # Example environment file (optional)
@@ -137,6 +136,13 @@ source .venv/bin/activate  # on Windows: .venv\Scripts\activate
 
 # Install in editable/dev mode
 pip install -e .
+
+# Run
+claii "your prompt"
+
+# Or optionally:
+
+python -m claii.cli "your prompt"
 ```
 
 ### Dependencies
