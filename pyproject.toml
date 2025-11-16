@@ -15,3 +15,7 @@ dependencies = [
 
 [project.scripts]
 claii = "claii.cli:main"
+
+# Tells setuptools exactly which packages to include
+[tool.setuptools]
+packages = ["claii", "functions", "calculator"]
