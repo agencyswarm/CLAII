@@ -18,11 +18,16 @@ def load_memory(project_root: str | Path) -> List[types.Content]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
-    # reconstruct minimal Contents from stored dicts
+
     messages: List[types.Content] = []
     for item in data:
         role = item.get("role", "user")
         text = item.get("text", "")
+
+        # 🔧 Normalize roles for Gemini: only "user" or "model" allowed
+        if role not in ("user", "model"):
+            role = "user"
+
         messages.append(
             types.Content(
                 role=role,
@@ -30,6 +35,7 @@ def load_memory(project_root: str | Path) -> List[types.Content]:
             )
         )
     return messages
+
 
 def save_memory(project_root: str | Path, messages: List[types.Content]) -> None:
     path = _memory_path(Path(project_root))

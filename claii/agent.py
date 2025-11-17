@@ -23,7 +23,9 @@ from functions.get_kb_file import schema_get_kb_file, get_kb_file
 
 MAX_AGENT_STEPS = 20          # max reasoning/tool-use iterations per run
 MAX_MEMORY_MESSAGES = 200     # how many messages to keep when pruning history
-DEFAULT_WORKING_DIR = "calculator"
+DEFAULT_WORKING_DIR = "."     # current directory. 
+# You can change DEFAULT_WORKING_DIR to sub-dirs in your project to tighten agent scope, but this will limit what the agent can "see".
+
 
 
 # ─── Arg parsing & helpers ─────────────────────────────────────────────────────
@@ -128,10 +130,16 @@ def expand_at_mentions(prompt: str, working_directory: str) -> str:
 
 # ─── Function dispatcher ───────────────────────────────────────────────────────
 
+# ─── Function dispatcher ───────────────────────────────────────────────────────
+
 def _call_function(function_call_part, verbose: bool = False) -> types.Content:
     """
     Dispatch a model function_call to the underlying Python implementation
     and wrap the result back into a tool response Content.
+
+    NOTE:
+    - Gemini's SDK only accepts roles "user" or "model".
+      We encode tool results as `role="user"` with a function_response part.
     """
     function_name = function_call_part.name
     args = dict(function_call_part.args or {})
@@ -154,8 +162,10 @@ def _call_function(function_call_part, verbose: bool = False) -> types.Content:
 
     fn = fn_map.get(function_name)
     if fn is None:
+        # Unknown function name – return a tool-style error object,
+        # but encoded as a `user` message with a function_response.
         return types.Content(
-            role="tool",
+            role="user",
             parts=[
                 types.Part.from_function_response(
                     name=function_name,
@@ -164,13 +174,15 @@ def _call_function(function_call_part, verbose: bool = False) -> types.Content:
             ],
         )
 
+    # Actually run the underlying function
     result = fn(**args)
 
     if verbose:
         print(f"-> {result!r}")
 
+    # Wrap as a tool response for the model
     return types.Content(
-        role="tool",
+        role="user",
         parts=[
             types.Part.from_function_response(
                 name=function_name,
@@ -229,6 +241,19 @@ Knowledge base usage:
   under the working directory. Inline KB content or call get_kb_file as needed.
 - When the user mentions @file:<path>, treat it as a hint to inspect that project file
   via get_file_content with file_path="<path>".
+
+Path handling rules:
+
+- If a user mentions a path that might be inside the working directory, ALWAYS
+  call get_files_info or get_file_content to check, instead of assuming it does
+  not exist. Never claim a directory or file is invalid without calling a tool.
+
+- Treat most user paths as project-relative. If a user writes something like
+  "/src", "/root", or "/claii.egg-info", interpret these as relative to the
+  working directory (e.g. "src", "root", "claii.egg-info") unless it is clearly
+  an absolute OS path such as "/home/user/...". When in doubt, prefer the
+  project-relative interpretation and call a tool rather than refusing.
+
 """
 
     # ── Memory bootstrap ───────────────────────────────────────────────────────
